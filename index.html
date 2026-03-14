@@ -1,6 +1,12 @@
-
-<style>
-    @import url('https://fonts.googleapis.com/css2?family=DM+Serif+Display&family=DM+Sans:wght@400;500&display=swap');
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>Pitch Night</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display&family=DM+Sans:wght@400;500&display=swap" rel="stylesheet">
+  <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body { font-family: 'DM Sans', sans-serif; background: #0d0d0d; color: #f0ede6; min-height: 100vh; display: flex; align-items: flex-start; justify-content: center; padding: 2rem 1rem 3rem; }
     .shell { width: 100%; max-width: 420px; }
@@ -33,220 +39,212 @@
     .status.error { color: #F0997B; }
     .success-flash { display: none; text-align: center; padding: 2rem 1rem; }
     .success-flash .big { font-family: 'DM Serif Display', serif; font-size: 2.8rem; }
-    .success-flash .msg { font-size: 14px; color: #888; margin-top: 8px; line-height: 1.6; }
+    .success-flash .msg { font-size: 14px; color: #888; margin-top: 8px; line-height: 1.6; white-space: pre-line; }
     .reset-btn { margin-top: 1.5rem; background: none; border: 0.5px solid #2e2e2e; border-radius: 100px; color: #888; padding: 8px 20px; font-family: 'DM Sans', sans-serif; font-size: 13px; cursor: pointer; transition: all 0.15s; }
     .reset-btn:hover { color: #f0ede6; border-color: #555; }
   </style>
-  
-  <div class="shell">
-    <div class="header">
-      <h1>Pitch Night</h1>
-      <div class="sub">Score the presenters</div>
-    </div>
-  
-    <div id="main-form">
-      <div class="card">
-        <div class="card-label">You are</div>
-        <div class="pill-grid" id="judge-pills"></div>
-      </div>
-  
-      <div class="card" id="presenter-card" style="opacity:0.4; pointer-events:none;">
-        <div class="card-label">
-          <span>Presenting tonight</span>
-          <span class="card-hint" id="presenter-hint">select all that apply</span>
-        </div>
-        <div class="pill-grid" id="presenter-pills"></div>
-      </div>
-  
-      <div class="card" id="scores-card" style="opacity:0.4; pointer-events:none;">
-        <div id="criteria-blocks"></div>
-      </div>
-  
-      <button class="submit-btn" id="submit-btn" disabled>Submit scores</button>
-      <div class="status" id="status-msg"></div>
-    </div>
-  
-    <div class="success-flash" id="success-screen">
-      <div class="big">✓</div>
-      <div class="msg" id="success-msg"></div>
-      <button class="reset-btn" onclick="resetForm()">Score another round</button>
-    </div>
+</head>
+<body>
+
+<div class="shell">
+  <div class="header">
+    <h1>Pitch Night</h1>
+    <div class="sub">Score the presenters</div>
   </div>
-  
-  <script>
-    const WEBHOOK = 'https://script.google.com/macros/s/AKfycbxigDehIFktsh3XUJ6DRaCfq_Pc5P2nCcyohD2_j3qL_8cEhWe5X9otUBj-j8niIVOzGQ/exec';
-    const PEOPLE = ['Gaurav','Mai','Keyan','Emily','Mavis','Fioana','Jason','Justin'];
-    const CRITERIA = [
-      { key: 'product', label: 'Product' },
-      { key: 'pitch', label: 'Pitch' },
-      { key: 'humour', label: 'Humour' }
-    ];
-  
-    let state = { judge: null, presenters: [], scores: { product: null, pitch: null, humour: null } };
-  
-    function buildJudgePills() {
-      const c = document.getElementById('judge-pills');
-      c.innerHTML = '';
-      PEOPLE.forEach(name => {
-        const p = document.createElement('div');
-        p.className = 'pill' + (state.judge === name ? ' selected' : '');
-        p.textContent = name;
-        p.onclick = () => onJudgeSelect(name);
-        c.appendChild(p);
-      });
-    }
-  
-    function buildPresenterPills() {
-      const c = document.getElementById('presenter-pills');
-      c.innerHTML = '';
-      PEOPLE.forEach(name => {
-        const isJudge = name === state.judge;
-        const isSelected = state.presenters.includes(name);
-        const p = document.createElement('div');
-        p.className = 'pill' + (isSelected ? ' selected' : '') + (isJudge ? ' unavailable' : '');
-        p.textContent = name;
-        if (!isJudge) {
-          p.onclick = () => togglePresenter(name);
-        }
-        c.appendChild(p);
-      });
-    }
-  
-    function togglePresenter(name) {
-      const idx = state.presenters.indexOf(name);
-      if (idx === -1) state.presenters.push(name);
-      else state.presenters.splice(idx, 1);
-      buildPresenterPills();
-  
-      const hasPresenter = state.presenters.length > 0;
-      document.getElementById('scores-card').style.opacity = hasPresenter ? '1' : '0.4';
-      document.getElementById('scores-card').style.pointerEvents = hasPresenter ? 'auto' : 'none';
-      checkReady();
-    }
-  
-    function buildCriteria() {
-      const c = document.getElementById('criteria-blocks');
-      c.innerHTML = '';
-      CRITERIA.forEach((cr, ci) => {
-        const block = document.createElement('div');
-        block.className = 'criteria-block';
-        block.innerHTML = `
-          <div class="criteria-name">
-            <span>${cr.label}</span>
-            <span class="score-display unset" id="disp-${cr.key}">—</span>
-          </div>
-          <div class="score-row" id="row-${cr.key}"></div>
-          ${ci < CRITERIA.length - 1 ? '<div class="divider"></div>' : ''}`;
-        c.appendChild(block);
-  
-        const row = document.getElementById('row-' + cr.key);
-        for (let i = 1; i <= 10; i++) {
-          const btn = document.createElement('button');
-          btn.className = 'score-btn' + (state.scores[cr.key] === i ? ' active' : '');
-          btn.textContent = i;
-          btn.onclick = () => setScore(cr.key, i);
-          row.appendChild(btn);
-        }
-      });
-    }
-  
-    function setScore(key, val) {
-      state.scores[key] = val;
-      const disp = document.getElementById('disp-' + key);
-      disp.textContent = val;
-      disp.classList.remove('unset');
-      document.querySelectorAll('#row-' + key + ' .score-btn').forEach((btn, i) => {
-        btn.classList.toggle('active', i + 1 === val);
-      });
-      checkReady();
-    }
-  
-    function onJudgeSelect(name) {
-      state.judge = name;
-      state.presenters = state.presenters.filter(p => p !== name);
-      state.scores = { product: null, pitch: null, humour: null };
-  
-      buildJudgePills();
-      buildPresenterPills();
-  
-      document.getElementById('presenter-card').style.opacity = '1';
-      document.getElementById('presenter-card').style.pointerEvents = 'auto';
-  
-      const hasPresenter = state.presenters.length > 0;
-      document.getElementById('scores-card').style.opacity = hasPresenter ? '1' : '0.4';
-      document.getElementById('scores-card').style.pointerEvents = hasPresenter ? 'auto' : 'none';
-  
-      buildCriteria();
-      checkReady();
-    }
-  
-    function checkReady() {
-      const allScored = CRITERIA.every(cr => state.scores[cr.key] !== null);
-      document.getElementById('submit-btn').disabled = !(state.judge && state.presenters.length > 0 && allScored);
-    }
-  
-    async function submitScores() {
-      const btn = document.getElementById('submit-btn');
-      btn.disabled = true;
-      btn.textContent = 'Submitting...';
-      showStatus('', '');
-  
-      const payload = {
-        timestamp: new Date().toISOString(),
-        judge: state.judge,
-        presenters: state.presenters.join(', '),
-        product: state.scores.product,
-        pitch: state.scores.pitch,
-        humour: state.scores.humour
-      };
-  
-      try {
-        await fetch(WEBHOOK, {
-          method: 'POST',
-          mode: 'no-cors',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(payload)
-        });
-  
-        document.getElementById('main-form').style.display = 'none';
-        document.getElementById('success-screen').style.display = 'block';
-        const presenterStr = state.presenters.length === 1
-          ? state.presenters[0]
-          : state.presenters.slice(0, -1).join(', ') + ' & ' + state.presenters[state.presenters.length - 1];
-        document.getElementById('success-msg').textContent =
-          `${state.judge} scored ${presenterStr}\nProduct ${state.scores.product} · Pitch ${state.scores.pitch} · Humour ${state.scores.humour}`;
-      } catch (e) {
-        showStatus('Something went wrong. Please try again.', 'error');
-        btn.disabled = false;
-        btn.textContent = 'Submit scores';
+
+  <div id="main-form">
+    <div class="card">
+      <div class="card-label">You are</div>
+      <div class="pill-grid" id="judge-pills"></div>
+    </div>
+
+    <div class="card" id="presenter-card" style="opacity:0.4; pointer-events:none;">
+      <div class="card-label">
+        <span>Presenting tonight</span>
+        <span class="card-hint">select all that apply</span>
+      </div>
+      <div class="pill-grid" id="presenter-pills"></div>
+    </div>
+
+    <div class="card" id="scores-card" style="opacity:0.4; pointer-events:none;">
+      <div id="criteria-blocks"></div>
+    </div>
+
+    <button class="submit-btn" id="submit-btn" disabled>Submit scores</button>
+    <div class="status" id="status-msg"></div>
+  </div>
+
+  <div class="success-flash" id="success-screen">
+    <div class="big">✓</div>
+    <div class="msg" id="success-msg"></div>
+    <button class="reset-btn" onclick="resetForm()">Score another round</button>
+  </div>
+</div>
+
+<script>
+  const WEBHOOK = 'https://script.google.com/macros/s/AKfycbxigDehIFktsh3XUJ6DRaCfq_Pc5P2nCcyohD2_j3qL_8cEhWe5X9otUBj-j8niIVOzGQ/exec';
+  const PEOPLE = ['Gaurav','Mai','Keyan','Mavis','Fiona','Jason','Justin'];
+  const CRITERIA = [
+    { key: 'product', label: 'Product' },
+    { key: 'pitch', label: 'Pitch' },
+    { key: 'humour', label: 'Humour' }
+  ];
+
+  let state = { judge: null, presenters: [], scores: { product: null, pitch: null, humour: null } };
+
+  function buildJudgePills() {
+    const c = document.getElementById('judge-pills');
+    c.innerHTML = '';
+    PEOPLE.forEach(name => {
+      const p = document.createElement('div');
+      p.className = 'pill' + (state.judge === name ? ' selected' : '');
+      p.textContent = name;
+      p.onclick = () => onJudgeSelect(name);
+      c.appendChild(p);
+    });
+  }
+
+  function buildPresenterPills() {
+    const c = document.getElementById('presenter-pills');
+    c.innerHTML = '';
+    PEOPLE.forEach(name => {
+      const isJudge = name === state.judge;
+      const isSelected = state.presenters.includes(name);
+      const p = document.createElement('div');
+      p.className = 'pill' + (isSelected ? ' selected' : '') + (isJudge ? ' unavailable' : '');
+      p.textContent = name;
+      if (!isJudge) p.onclick = () => togglePresenter(name);
+      c.appendChild(p);
+    });
+  }
+
+  function togglePresenter(name) {
+    const idx = state.presenters.indexOf(name);
+    if (idx === -1) state.presenters.push(name);
+    else state.presenters.splice(idx, 1);
+    buildPresenterPills();
+    const hasPresenter = state.presenters.length > 0;
+    document.getElementById('scores-card').style.opacity = hasPresenter ? '1' : '0.4';
+    document.getElementById('scores-card').style.pointerEvents = hasPresenter ? 'auto' : 'none';
+    checkReady();
+  }
+
+  function buildCriteria() {
+    const c = document.getElementById('criteria-blocks');
+    c.innerHTML = '';
+    CRITERIA.forEach((cr, ci) => {
+      const block = document.createElement('div');
+      block.className = 'criteria-block';
+      block.innerHTML = `
+        <div class="criteria-name">
+          <span>${cr.label}</span>
+          <span class="score-display unset" id="disp-${cr.key}">—</span>
+        </div>
+        <div class="score-row" id="row-${cr.key}"></div>
+        ${ci < CRITERIA.length - 1 ? '<div class="divider"></div>' : ''}`;
+      c.appendChild(block);
+      const row = document.getElementById('row-' + cr.key);
+      for (let i = 1; i <= 10; i++) {
+        const btn = document.createElement('button');
+        btn.className = 'score-btn' + (state.scores[cr.key] === i ? ' active' : '');
+        btn.textContent = i;
+        btn.onclick = () => setScore(cr.key, i);
+        row.appendChild(btn);
       }
-    }
-  
-    function showStatus(msg, type) {
-      const el = document.getElementById('status-msg');
-      el.textContent = msg;
-      el.className = 'status ' + (type || '');
-    }
-  
-    function resetForm() {
-      state = { judge: null, presenters: [], scores: { product: null, pitch: null, humour: null } };
-      document.getElementById('main-form').style.display = 'block';
-      document.getElementById('success-screen').style.display = 'none';
-      buildJudgePills();
-      buildPresenterPills();
-      document.getElementById('presenter-card').style.opacity = '0.4';
-      document.getElementById('presenter-card').style.pointerEvents = 'none';
-      document.getElementById('scores-card').style.opacity = '0.4';
-      document.getElementById('scores-card').style.pointerEvents = 'none';
-      buildCriteria();
-      document.getElementById('submit-btn').disabled = true;
-      document.getElementById('submit-btn').textContent = 'Submit scores';
-      showStatus('', '');
-    }
-  
-    document.getElementById('submit-btn').onclick = submitScores;
+    });
+  }
+
+  function setScore(key, val) {
+    state.scores[key] = val;
+    const disp = document.getElementById('disp-' + key);
+    disp.textContent = val;
+    disp.classList.remove('unset');
+    document.querySelectorAll('#row-' + key + ' .score-btn').forEach((btn, i) => {
+      btn.classList.toggle('active', i + 1 === val);
+    });
+    checkReady();
+  }
+
+  function onJudgeSelect(name) {
+    state.judge = name;
+    state.presenters = state.presenters.filter(p => p !== name);
+    state.scores = { product: null, pitch: null, humour: null };
     buildJudgePills();
     buildPresenterPills();
+    document.getElementById('presenter-card').style.opacity = '1';
+    document.getElementById('presenter-card').style.pointerEvents = 'auto';
+    const hasPresenter = state.presenters.length > 0;
+    document.getElementById('scores-card').style.opacity = hasPresenter ? '1' : '0.4';
+    document.getElementById('scores-card').style.pointerEvents = hasPresenter ? 'auto' : 'none';
     buildCriteria();
-  </script>
-  
+    checkReady();
+  }
+
+  function checkReady() {
+    const allScored = CRITERIA.every(cr => state.scores[cr.key] !== null);
+    document.getElementById('submit-btn').disabled = !(state.judge && state.presenters.length > 0 && allScored);
+  }
+
+  async function submitScores() {
+    const btn = document.getElementById('submit-btn');
+    btn.disabled = true;
+    btn.textContent = 'Submitting...';
+    document.getElementById('status-msg').textContent = '';
+
+    const payload = {
+      timestamp: new Date().toISOString(),
+      judge: state.judge,
+      presenters: state.presenters.join(', '),
+      product: state.scores.product,
+      pitch: state.scores.pitch,
+      humour: state.scores.humour
+    };
+
+    try {
+      await fetch(WEBHOOK, {
+        method: 'POST',
+        mode: 'no-cors',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+      document.getElementById('main-form').style.display = 'none';
+      document.getElementById('success-screen').style.display = 'block';
+      const presenterStr = state.presenters.length === 1
+        ? state.presenters[0]
+        : state.presenters.slice(0, -1).join(', ') + ' & ' + state.presenters[state.presenters.length - 1];
+      document.getElementById('success-msg').textContent =
+        `${state.judge} scored ${presenterStr}\nProduct ${state.scores.product} · Pitch ${state.scores.pitch} · Humour ${state.scores.humour}`;
+    } catch (e) {
+      const s = document.getElementById('status-msg');
+      s.textContent = 'Something went wrong. Please try again.';
+      s.className = 'status error';
+      btn.disabled = false;
+      btn.textContent = 'Submit scores';
+    }
+  }
+
+  function resetForm() {
+    state = { judge: null, presenters: [], scores: { product: null, pitch: null, humour: null } };
+    document.getElementById('main-form').style.display = 'block';
+    document.getElementById('success-screen').style.display = 'none';
+    buildJudgePills();
+    buildPresenterPills();
+    document.getElementById('presenter-card').style.opacity = '0.4';
+    document.getElementById('presenter-card').style.pointerEvents = 'none';
+    document.getElementById('scores-card').style.opacity = '0.4';
+    document.getElementById('scores-card').style.pointerEvents = 'none';
+    buildCriteria();
+    document.getElementById('submit-btn').disabled = true;
+    document.getElementById('submit-btn').textContent = 'Submit scores';
+    document.getElementById('status-msg').textContent = '';
+    document.getElementById('status-msg').className = 'status';
+  }
+
+  document.getElementById('submit-btn').onclick = submitScores;
+  buildJudgePills();
+  buildPresenterPills();
+  buildCriteria();
+</script>
+
+</body>
+</html>
